@@ -7,7 +7,7 @@
 def summary_params = NfcoreSchema.paramsSummaryMap(workflow, params)
 
 // Validate input parameters
-WorkflowBamtorawvcf.initialise(params, log)
+//Workflowbamtorawvcf.initialise(params, log)
 
 // TODO nf-core: Add all file path parameters for the pipeline to the list below
 // Check input path parameters to see if they exist
@@ -37,7 +37,9 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK } from '../subworkflows/local/input_check'
+
+include { FASTA_INDICES } from '../subworkflows/local/fasta_indices'
+include { CREATE_GVCF   } from '../subworkflows/local/create_gvcf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,9 +50,6 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 //
 // MODULE: Installed directly from nf-core/modules
 //
-include { FASTQC                      } from '../modules/nf-core/fastqc/main'
-include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
-include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,52 +60,46 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoft
 // Info required for completion email and summary
 def multiqc_report = []
 
-workflow BAMTORAWVCF {
+workflow BAMTORAWVCF{
 
     ch_versions = Channel.empty()
 
+    Channel
+        .fromFilePairs(params.input)
+        .view()
+        .set{ bamPair }
+    
+    tuple_meta_bam = bamPair.map{ sampleN, bamPa -> tuple([id:sampleN, single_end:false], bamPa[0], bamPa[1]) }
+
     //
-    // SUBWORKFLOW: Read in samplesheet, validate and stage input files
+    // SUBWORKFLOW: Deals with picard seq dict and samtools faidx
     //
-    INPUT_CHECK (
-        ch_input
+    
+    fastaF = Channel.fromPath(params.fasta)
+
+    FASTA_INDICES(
+        fastaF
+     )
+    
+    picard_ver = params.skip_picard_seqdict ?'':FASTA_INDICES.out.picard_seqdict_version
+
+    faidx_ver = params.skip_samtools_faidx?'':FASTA_INDICES.out.samtools_faidx_version
+
+    if ( picard_ver != ''){
+        ch_versions = ch_versions.mix( picard_ver )
+        }
+    if ( faidx_ver != ''){
+        ch_version = ch_versions.mix(faidx_ver)
+        }
+    
+    // prepare input channel for CREATE_GVCF
+
+    CREATE_GVCF(
+        tuple_meta_bam,
+        fastaF,
+        FASTA_INDICES.out.fa_idx,
+        FASTA_INDICES.out.picard_idx
     )
-    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
-
-    //
-    // MODULE: Run FastQC
-    //
-    FASTQC (
-        INPUT_CHECK.out.reads
-    )
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
-
-    CUSTOM_DUMPSOFTWAREVERSIONS (
-        ch_versions.unique().collectFile(name: 'collated_versions.yml')
-    )
-
-    //
-    // MODULE: MultiQC
-    //
-    workflow_summary    = WorkflowBamtorawvcf.paramsSummaryMultiqc(workflow, summary_params)
-    ch_workflow_summary = Channel.value(workflow_summary)
-
-    methods_description    = WorkflowBamtorawvcf.methodsDescriptionText(workflow, ch_multiqc_custom_methods_description)
-    ch_methods_description = Channel.value(methods_description)
-
-    ch_multiqc_files = Channel.empty()
-    ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
-    ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
-    ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
-
-    MULTIQC (
-        ch_multiqc_files.collect(),
-        ch_multiqc_config.toList(),
-        ch_multiqc_custom_config.toList(),
-        ch_multiqc_logo.toList()
-    )
-    multiqc_report = MULTIQC.out.report.toList()
 }
 
 /*
