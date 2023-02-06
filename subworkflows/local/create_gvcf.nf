@@ -3,14 +3,15 @@
 //
 
 include { GATK4_HAPLOTYPECALLER } from '../../modules/nf-core/gatk4/haplotypecaller/main'
-include { GATK4_HAPLOTYPECALLER_REG } from '../../modules/local/gatk/haplotypecaller_reg/main'
+include { GATK_HAPLOTYPECALLER_REG } from '../../modules/local/gatk/haplotypecaller_reg/main'
+include { PICARD_SORTVCF        } from '../../modules/local/picard/sortvcf/main'
 
 workflow CREATE_GVCF{
     take:
-        tuple_meta_bam
-        fastaF
-        fai 
-        dict
+    tuple_meta_bam
+    fastaF
+    fai 
+    dict
 
     main:
     if ( !params.skip_regionwise_gvcf ){    
@@ -36,14 +37,13 @@ workflow CREATE_GVCF{
     input_arg3 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> fai }
     input_arg4 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> dict }
 
-    input_arg1.view()
-
 
     //
     //MODULE GATK4_HAPLOTYPECALLER
+    //
 
     if ( !params.skip_regionwise_gvcf ){    
-        GATK4_HAPLOTYPECALLER_REG(
+        GATK_HAPLOTYPECALLER_REG(
             input_arg1,
             input_arg2,
             input_arg3,
@@ -51,7 +51,27 @@ workflow CREATE_GVCF{
             [],
             []
             )
+            
+            vcfF = GATK_HAPLOTYPECALLER_REG.out.vcf.groupTuple()
+            vcfF_fastaF = vcfF.combine(fastaF)
+            vcf_fastaF_dict = vcfF_fastaF.combine(dict)
+
+            input1_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> tuple(meta, vcfFiles) }
+            input2_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> refFile }
+            input3_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> dictFile }
+
+            //
+            // merge and sort chromosome-wise gvcf files emited by the previous functin
+            //
+
+            PICARD_SORTVCF(
+                input1_picard_sortvcf,
+                input2_picard_sortvcf,
+                input3_picard_sortvcf
+            )
+        
         }
+
     else{
         GATK4_HAPLOTYPECALLER(
             input_arg1,

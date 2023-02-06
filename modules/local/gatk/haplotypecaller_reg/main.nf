@@ -1,4 +1,4 @@
-process GATK4_HAPLOTYPECALLER_REG{
+process GATK_HAPLOTYPECALLER_REG{
     tag "$meta.id"
     label 'process_medium'
 
@@ -41,7 +41,7 @@ process GATK4_HAPLOTYPECALLER_REG{
     """
     gatk --java-options "-Xmx${avail_mem}g" HaplotypeCaller \\
         --input $input \\
-        --output ${prefix}.vcf.gz \\
+        --output ${prefix}.${intervals}.vcf.gz \\
         --reference $fasta \\
         $dbsnp_command \\
         $interval_command \\
