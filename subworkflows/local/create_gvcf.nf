@@ -5,6 +5,7 @@
 include { GATK4_HAPLOTYPECALLER } from '../../modules/nf-core/gatk4/haplotypecaller/main'
 include { GATK_HAPLOTYPECALLER_REG } from '../../modules/local/gatk/haplotypecaller_reg/main'
 include { PICARD_SORTVCF        } from '../../modules/local/picard/sortvcf/main'
+include { GATK4_GENOMICSDBIMPORT } from '../../modules/nf-core/gatk4/genomicsdbimport/main'
 
 workflow CREATE_GVCF{
     take:
@@ -61,7 +62,7 @@ workflow CREATE_GVCF{
             input3_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> dictFile }
 
             //
-            // merge and sort chromosome-wise gvcf files emited by the previous functin
+            // merge and sort chromosome-wise gvcf files emited by the previous function
             //
 
             PICARD_SORTVCF(
@@ -69,7 +70,11 @@ workflow CREATE_GVCF{
                 input2_picard_sortvcf,
                 input3_picard_sortvcf
             )
-        
+            
+            mergeGvcf = PICARD_SORTVCF.out.vcf
+            mergeTbi  = PICARD_SORTVCF.out.tbi
+            mergeGvcfTbi = mergeGvcf.combine( mergeTbi, by: 0 )
+
         }
 
     else{
@@ -81,5 +86,31 @@ workflow CREATE_GVCF{
             [],
             []
             )
+         mergeGvcf = GATK4_HAPLOTYPECALLER.out.vcf
+         mergeTbi  = GATK4_HAPLOTYPECALLER.out.tbi
+         mergeGvcfTbi = mergeGvcf.combine( mergeTbi, by: 0 )
         }
+
+    Channel
+        .fromPath( params.regions )
+        .splitText()
+        .map{ it -> it.trim() }
+        .set{ chrom }
+
+    mergeGvcfTbiReg = mergeGvcfTbi.combine( chrom )
+
+
+    updateMergeGvcfTbiReg = mergeGvcfTbiReg.map{ meta, vcf, tbi, chrom -> tuple( [id:chrom], vcf, tbi )}
+
+    input1_gatk4_genomicsdbimport = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
+
+    input1_gatk4_genomicsdbimport.view()
+
+
+    GATK4_GENOMICSDBIMPORT(
+        input1_gatk4_genomicsdbimport,
+        false,
+        false,
+        false
+    )
 }
