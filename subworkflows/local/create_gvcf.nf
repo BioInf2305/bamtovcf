@@ -102,13 +102,12 @@ workflow CREATE_GVCF{
 
     updateMergeGvcfTbiReg = mergeGvcfTbiReg.map{ meta, vcf, tbi, chrom -> tuple( [id:chrom], vcf, tbi )}
 
-    input1_gatk4_genomicsdbimport = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
+    input1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
 
-    input1_gatk4_genomicsdbimport.view()
 
 
     GATK4_GENOMICSDBIMPORT(
-        input1_gatk4_genomicsdbimport,
+        input1_gatk4_genomicsdbimprt,
         false,
         false,
         false
