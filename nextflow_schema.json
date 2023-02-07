@@ -55,9 +55,8 @@
                     "type": "string",
                     "description": "Path to file containing chromosome for which gvcf db is to be created"
                 },
-                "skip_update_genomicdb": {
-                    "type": "boolean",
-                    "description": "Skip updating genomicbi instead create it"
+                "genomic_db": {
+                    "type": "string"
                 }
             }
         },

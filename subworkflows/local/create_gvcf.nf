@@ -25,7 +25,7 @@ workflow CREATE_GVCF{
         bam_region.view()
         }
     else{
-        regionF = Channe.fromPath( params.regions )
+        regionF = Channel.fromPath( params.regions )
         bam_region = tuple_meta_bam.combine( regionF )
         }
 
@@ -102,14 +102,23 @@ workflow CREATE_GVCF{
 
     updateMergeGvcfTbiReg = mergeGvcfTbiReg.map{ meta, vcf, tbi, chrom -> tuple( [id:chrom], vcf, tbi )}
 
-    input1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
+    //input1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
 
+    if ( params.genomic_db != null ){
+        
+        update_merge_gvcf_tbi_reg_geno_db = updateMergeGvcfTbiReg.combine( params.genomic_db )   
+        input1_gatk4_genomicsdbimprt = update_merge_gvcf_tbi_reg_geno_db.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
 
+        }
+
+    else{
+
+        }
 
     GATK4_GENOMICSDBIMPORT(
         input1_gatk4_genomicsdbimprt,
         false,
         false,
         false
-    )
+        )
 }
