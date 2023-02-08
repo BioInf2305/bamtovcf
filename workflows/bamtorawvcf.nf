@@ -66,7 +66,6 @@ workflow BAMTORAWVCF{
 
     Channel
         .fromFilePairs(params.input)
-        .view()
         .set{ bamPair }
     
     tuple_meta_bam = bamPair.map{ sampleN, bamPa -> tuple([id:sampleN, single_end:false], bamPa[0], bamPa[1]) }

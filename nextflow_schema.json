@@ -53,10 +53,24 @@
                 },
                 "regions": {
                     "type": "string",
-                    "description": "Path to file containing chromosome for which gvcf db is to be created"
+                    "description": "Path to file containing chromosomes for which gvcf db is to be created"
                 },
                 "genomic_db": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Path to the file containing gatk gvcf database"
+                },
+                "dragstr_model": {
+                    "type": "string",
+                    "description": "Text file containing the DragSTR model of the used BAM/CRAM file"
+                },
+                "dbsnp": {
+                    "type": "string",
+                    "description": "Path to the vcf file of the known SNP database"
+                },
+                "batch_size": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "This controls the number of samples for which readers are open at once in GenomicsDBImport"
                 }
             }
         },

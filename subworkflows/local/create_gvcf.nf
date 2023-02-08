@@ -1,5 +1,5 @@
 //
-// create indices using bwa index and samtools faidx, depending on user-inputs
+// create indices using bwa index and samtools faidx, depending on user-inps
 //
 
 include { GATK4_HAPLOTYPECALLER } from '../../modules/nf-core/gatk4/haplotypecaller/main'
@@ -9,66 +9,99 @@ include { GATK4_GENOMICSDBIMPORT } from '../../modules/nf-core/gatk4/genomicsdbi
 
 workflow CREATE_GVCF{
     take:
-    tuple_meta_bam
+    tup_meta_bam
     fastaF
     fai 
     dict
 
     main:
+    
+    //skip_regionwise_gvcf is the parameter for deciding whether or not to create gvcf file in parallel using file
+    //provided as the argument for params.regions; this file should end with .list or .intervals. 
+
     if ( !params.skip_regionwise_gvcf ){    
         Channel
             .fromPath( params.regions )
             .splitText()
             .map{ it -> it.trim() }
             .set{ reg }
-        bam_region = tuple_meta_bam.combine(reg)
-        bam_region.view()
+        bam_reg = tup_meta_bam.combine(reg)
         }
     else{
         regionF = Channel.fromPath( params.regions )
-        bam_region = tuple_meta_bam.combine( regionF )
+        bam_reg = tup_meta_bam.combine( regionF )
         }
 
-    bam_fasta = bam_region.combine( fastaF )
-    bam_fasta_fai = bam_fasta.combine( fai )
-    bam_fasta_fai_seqdict = bam_fasta_fai.combine( dict )
+    //prepare inp channels for the module GATK?_HAPLOTYPECALLER*
 
-    input_arg1 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> tuple( meta, bam, idx, rg, [] ) }
-    input_arg2 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> fas }
-    input_arg3 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> fai }
-    input_arg4 = bam_fasta_fai_seqdict.map{ meta, bam, idx, rg, fas, fai, dict -> dict }
+    bam_reg_fas = bam_reg.combine( fastaF )
+    bam_reg_fas_fai = bam_reg_fas.combine( fai )
+    bam_reg_fas_fai_dic = bam_reg_fas_fai.combine( dict )
+
+
+    if( params.dragstr_model == null ){
+            //bam_reg_fas_fai_dic.view()
+            bam_reg_fas_fai_dic_drg = bam_reg_fas_fai_dic.combine(["none"])
+        }
+    else{
+            bam_reg_fas_fai_dic_drg = bam_reg_fas_fai_dic.combine( params.dragstr_model )
+        }
+
+
+    if ( params.dbsnp == null ){
+            bam_reg_fas_fai_dic_drg_dbs_dbi = bam_reg_fas_fai_dic_drg.combine([["none","none"]])
+        }
+    else{
+            Channel
+                .fromFilePairs( params.dbsnp)
+                .map{ pfx, dbsnp -> tuple( dbsnp[0], dbsnp[1] ) }
+                .set{ snp }
+
+            bam_reg_fas_fai_dic_drg_dbs_dbi = bam_reg_fas_fai_dic_drg.combine( snp )
+        }
+
+    
+    inp_arg1 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> tuple( meta, bam, idx, rg, drg == "none" ? [] : drg )}
+    inp_arg2 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> fas }
+    inp_arg3 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> fai }
+    inp_arg4 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> dict }
+    inp_arg5 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> dbs == "none"? [] :dbs }
+    inp_arg6 = bam_reg_fas_fai_dic_drg_dbs_dbi.map{ meta, bam, idx, rg, fas, fai, dict, drg, dbs, dbi -> dbi == "none"? [] : dbi}
+    
 
 
     //
-    //MODULE GATK4_HAPLOTYPECALLER
+    //if skip_regionwise_gvcf is not false --> do not run gatk haplotypecaller parallel for each region MODULE GATK4_HAPLOTYPECALLER a separate module
+    //"GATK_HAPLOTYPECALLER_REG" was created --> because nf-core module for haplotypecaller uses "file" as input channel for the region while here it could also be "val"
     //
+
 
     if ( !params.skip_regionwise_gvcf ){    
         GATK_HAPLOTYPECALLER_REG(
-            input_arg1,
-            input_arg2,
-            input_arg3,
-            input_arg4,
-            [],
-            []
+            inp_arg1,
+            inp_arg2,
+            inp_arg3,
+            inp_arg4,
+            inp_arg5,
+            inp_arg6
             )
             
             vcfF = GATK_HAPLOTYPECALLER_REG.out.vcf.groupTuple()
             vcfF_fastaF = vcfF.combine(fastaF)
             vcf_fastaF_dict = vcfF_fastaF.combine(dict)
 
-            input1_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> tuple(meta, vcfFiles) }
-            input2_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> refFile }
-            input3_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> dictFile }
+            inp1_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> tuple(meta, vcfFiles) }
+            inp2_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> refFile }
+            inp3_picard_sortvcf = vcf_fastaF_dict.map{ meta, vcfFiles, refFile, dictFile -> dictFile }
 
             //
-            // merge and sort chromosome-wise gvcf files emited by the previous function
+            // merge and sort chromosome-wise gvcf files emited by the previous module
             //
 
             PICARD_SORTVCF(
-                input1_picard_sortvcf,
-                input2_picard_sortvcf,
-                input3_picard_sortvcf
+                inp1_picard_sortvcf,
+                inp2_picard_sortvcf,
+                inp3_picard_sortvcf
             )
             
             mergeGvcf = PICARD_SORTVCF.out.vcf
@@ -79,17 +112,21 @@ workflow CREATE_GVCF{
 
     else{
         GATK4_HAPLOTYPECALLER(
-            input_arg1,
-            input_arg2,
-            input_arg3,
-            input_arg4,
-            [],
-            []
+            inp_arg1,
+            inp_arg2,
+            inp_arg3,
+            inp_arg4,
+            inp_arg5,
+            inp_arg6
             )
          mergeGvcf = GATK4_HAPLOTYPECALLER.out.vcf
          mergeTbi  = GATK4_HAPLOTYPECALLER.out.tbi
          mergeGvcfTbi = mergeGvcf.combine( mergeTbi, by: 0 )
         }
+
+    //
+    //here it is assumed that database folder name is same as that of the chromosome name --> for our group 
+    //
 
     Channel
         .fromPath( params.regions )
@@ -102,23 +139,22 @@ workflow CREATE_GVCF{
 
     updateMergeGvcfTbiReg = mergeGvcfTbiReg.map{ meta, vcf, tbi, chrom -> tuple( [id:chrom], vcf, tbi )}
 
-    //input1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
 
     if ( params.genomic_db != null ){
-        
-        update_merge_gvcf_tbi_reg_geno_db = updateMergeGvcfTbiReg.combine( params.genomic_db )   
-        input1_gatk4_genomicsdbimprt = update_merge_gvcf_tbi_reg_geno_db.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
-
-        }
-
+        inp1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, file(params.genomic_db+"/"+meta.id)) }
+        run_updatewspace = true
+        inp1_gatk4_genomicsdbimprt.view()
+    }
+    
     else{
-
-        }
+       inp1_gatk4_genomicsdbimprt = updateMergeGvcfTbiReg.groupTuple().map{meta, vcf, tbi -> tuple(meta, vcf, tbi, [], meta.id, []) }
+        run_updatewspace = false
+    }
 
     GATK4_GENOMICSDBIMPORT(
-        input1_gatk4_genomicsdbimprt,
+        inp1_gatk4_genomicsdbimprt,
         false,
-        false,
+        run_updatewspace,
         false
         )
 }
