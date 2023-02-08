@@ -12,7 +12,8 @@
             "description": "Define where the pipeline should find input data and save output data.",
             "required": [
                 "input",
-                "outdir"
+                "outdir",
+                "regions"
             ],
             "properties": {
                 "input": {
@@ -124,7 +125,11 @@
                 "samtools_faidx": {
                     "type": "string"
                 }
-            }
+            },
+            "required": [
+                "genome",
+                "fasta"
+            ]
         },
         "institutional_config_options": {
             "title": "Institutional config options",
