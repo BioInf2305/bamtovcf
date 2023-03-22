@@ -58,7 +58,7 @@
                 },
                 "genomic_db": {
                     "type": "string",
-                    "description": "Path to the file containing gatk gvcf database"
+                    "description": "Path to the parent directory of the gatk gvcf database"
                 },
                 "dragstr_model": {
                     "type": "string",
@@ -72,6 +72,10 @@
                     "type": "integer",
                     "default": 10,
                     "description": "This controls the number of samples for which readers are open at once in GenomicsDBImport"
+                },
+                "skip_bam_to_gvcf": {
+                    "type": "boolean",
+                    "description": "Skip bam to gvcf step. Input should be gvcf if this option is invoked."
                 }
             }
         },
@@ -125,11 +129,7 @@
                 "samtools_faidx": {
                     "type": "string"
                 }
-            },
-            "required": [
-                "genome",
-                "fasta"
-            ]
+            }
         },
         "institutional_config_options": {
             "title": "Institutional config options",

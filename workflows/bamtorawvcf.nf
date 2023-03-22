@@ -40,6 +40,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 
 include { FASTA_INDICES } from '../subworkflows/local/fasta_indices'
 include { CREATE_GVCF   } from '../subworkflows/local/create_gvcf'
+include { RUN_GENOMICSDBIMPORT } from '../subworkflows/local/run_genomicsdbimport'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,6 +64,8 @@ def multiqc_report = []
 workflow BAMTORAWVCF{
 
     ch_versions = Channel.empty()
+
+    if( !params.skip_bam_to_gvcf ){
 
     Channel
         .fromFilePairs(params.input)
@@ -98,6 +101,23 @@ workflow BAMTORAWVCF{
         fastaF,
         FASTA_INDICES.out.fa_idx,
         FASTA_INDICES.out.picard_idx
+        )
+    mergeGvcfTbi = CREATE_GVCF.out.mergeGvcfTbi
+   }
+   else{
+    Channel
+        .fromFilePairs( params.input )
+        .set{ gvcfPair }
+
+    gvcfs = gvcfPair.map{ sampleN, gvcfPa -> tuple(sampleN, gvcfPa[0]) }
+    gvcfIdx = gvcfPair.map{ sampleN, gvcfPa -> tuple(sampleN, gvcfPa[1]) }
+
+    mergeGvcfTbi = gvcfs.combine( gvcfIdx, by: 0 )
+
+    }
+
+    RUN_GENOMICSDBIMPORT(
+        mergeGvcfTbi
     )
 }
 
