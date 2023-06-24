@@ -41,6 +41,8 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 include { FASTA_INDICES } from '../subworkflows/local/fasta_indices'
 include { CREATE_GVCF   } from '../subworkflows/local/create_gvcf'
 include { RUN_GENOMICSDBIMPORT } from '../subworkflows/local/run_genomicsdbimport'
+include { GATK4_GENOTYPEGVCFS } from '../modules/nf-core/gatk4/genotypegvcfs/main'
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,7 +67,7 @@ workflow BAMTORAWVCF{
 
     ch_versions = Channel.empty()
 
-    if( !params.skip_bam_to_gvcf ){
+    if( !params.add_gvcf ){
 
     Channel
         .fromFilePairs(params.input)
@@ -105,6 +107,7 @@ workflow BAMTORAWVCF{
     mergeGvcfTbi = CREATE_GVCF.out.mergeGvcfTbi
    }
    else{
+    if( params.add_gvcf && !params.create_raw_vcf ){
     Channel
         .fromFilePairs( params.input )
         .set{ gvcfPair }
@@ -113,12 +116,56 @@ workflow BAMTORAWVCF{
     gvcfIdx = gvcfPair.map{ sampleN, gvcfPa -> tuple(sampleN, gvcfPa[1]) }
 
     mergeGvcfTbi = gvcfs.combine( gvcfIdx, by: 0 )
-
-    }
-
+    
     RUN_GENOMICSDBIMPORT(
         mergeGvcfTbi
     )
+
+    }
+
+    if( params.create_raw_vcf){
+
+    fastaF = Channel.fromPath(params.fasta)
+
+    FASTA_INDICES(
+        fastaF
+     )
+    
+    picard_ver = params.skip_picard_seqdict ?'':FASTA_INDICES.out.picard_seqdict_version
+
+    faidx_ver = params.skip_samtools_faidx?'':FASTA_INDICES.out.samtools_faidx_version
+
+    if ( picard_ver != ''){
+        ch_versions = ch_versions.mix( picard_ver )
+        }
+    if ( faidx_ver != ''){
+        ch_version = ch_versions.mix(faidx_ver)
+        }
+    
+    Channel
+        .fromPath( params.regions )
+        .splitText()
+        .map{ it -> it.trim() }
+        .set{ chrom }
+    chrom_fa = chrom.combine(fastaF)
+    chrom_fa_faidx = chrom_fa.combine(FASTA_INDICES.out.fa_idx)
+    chrom_fa_faidx_dict = chrom_fa_faidx.combine(FASTA_INDICES.out.picard_idx)
+    n1_genotypegvf_inp = chrom_fa_faidx_dict.map{ chrom, fa, faidx, dict -> tuple( [id:chrom], file(params.genomic_db+"/"+chrom),[], [],[])}
+    n1_genotypegvf_inp.view()
+    fa_idx = chrom_fa_faidx_dict.map{ chrom, fa, faidx, dict -> tuple(faidx)}
+    dict = chrom_fa_faidx_dict.map{ chrom, fa, faidx, dict -> tuple(dict)}
+    fas_f = chrom_fa_faidx_dict.map{ chrom, fa, faidx, dict -> tuple(fa)}
+    
+    GATK4_GENOTYPEGVCFS(
+        n1_genotypegvf_inp,
+        fas_f,
+        fa_idx,
+        dict,
+        [],
+        []
+    )
+    }
+    }
 }
 
 /*
