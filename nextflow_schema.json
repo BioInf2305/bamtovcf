@@ -75,6 +75,11 @@
                 "add_gvcf": {
                     "type": "boolean",
                     "description": "Whether or not to add gvcf"
+                },
+                "target_pos_file": {
+                    "type": "string",
+                    "default": "na",
+                    "description": "path to the file containing target positions"
                 }
             }
         },
