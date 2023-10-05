@@ -11,7 +11,6 @@
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
             "required": [
-                "input",
                 "outdir",
                 "regions"
             ],
@@ -44,10 +43,6 @@
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
                 },
-                "skip_create_raw_vcf": {
-                    "type": "boolean",
-                    "description": "skip creating raw vcf"
-                },
                 "skip_regionwise_gvcf": {
                     "type": "boolean",
                     "description": "skip creating regionwise gvcf file in parallel"
@@ -73,9 +68,18 @@
                     "default": 10,
                     "description": "This controls the number of samples for which readers are open at once in GenomicsDBImport"
                 },
-                "skip_bam_to_gvcf": {
+                "create_raw_vcf": {
                     "type": "boolean",
-                    "description": "Skip bam to gvcf step. Input should be gvcf if this option is invoked."
+                    "description": "Whether or not to create raw vcf"
+                },
+                "add_gvcf": {
+                    "type": "boolean",
+                    "description": "Whether or not to add gvcf"
+                },
+                "target_pos_file": {
+                    "type": "string",
+                    "default": "na",
+                    "description": "path to the file containing target positions"
                 }
             }
         },
