@@ -1,4 +1,4 @@
-# ![nf-core/bamtorawvcf](docs/images/nf-core-bamtorawvcf_logo_light.png#gh-light-mode-only) ![nf-core/bamtorawvcf](docs/images/nf-core-bamtorawvcf_logo_dark.png#gh-dark-mode-only)
+# ![nf-core/bamtovcf](docs/images/nf-core-bamtorawvcf_logo_light.png#gh-light-mode-only) ![nf-core/bamtovcf](docs/images/nf-core-bamtorawvcf_logo_dark.png#gh-dark-mode-only)
 
 [![AWS CI](https://img.shields.io/badge/CI%20tests-full%20size-FF9900?labelColor=000000&logo=Amazon%20AWS)](https://nf-co.re/bamtorawvcf/results)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
 
@@ -6,28 +6,33 @@
 [![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
-[![Launch on Nextflow Tower](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Nextflow%20Tower-%234256e7)](https://tower.nf/launch?pipeline=https://github.com/nf-core/bamtorawvcf)
+[![Launch on Nextflow Tower](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Nextflow%20Tower-%234256e7)](https://tower.nf/launch?pipeline=https://github.com/nf-core/bamtovcf)
 
-[![Get help on Slack](http://img.shields.io/badge/slack-nf--core%20%23bamtorawvcf-4A154B?labelColor=000000&logo=slack)](https://nfcore.slack.com/channels/bamtorawvcf)[![Follow on Twitter](http://img.shields.io/badge/twitter-%40nf__core-1DA1F2?labelColor=000000&logo=twitter)](https://twitter.com/nf_core)[![Watch on YouTube](http://img.shields.io/badge/youtube-nf--core-FF0000?labelColor=000000&logo=youtube)](https://www.youtube.com/c/nf-core)
+[![Get help on Slack](http://img.shields.io/badge/slack-nf--core%20%23bamtorawvcf-4A154B?labelColor=000000&logo=slack)](https://nfcore.slack.com/channels/bamtovcf)[![Follow on Twitter](http://img.shields.io/badge/twitter-%40nf__core-1DA1F2?labelColor=000000&logo=twitter)](https://twitter.com/nf_core)[![Watch on YouTube](http://img.shields.io/badge/youtube-nf--core-FF0000?labelColor=000000&logo=youtube)](https://www.youtube.com/c/nf-core)
 
 ## Introduction
 
 <!-- TODO nf-core: Write a 1-2 sentence summary of what data the pipeline is for and what it does -->
 
-**nf-core/bamtorawvcf** is a bioinformatics best-practice analysis pipeline for workflow to create row vcf files from filtered bam file.
+**nf-core/bamtovcf** is a bioinformatics best-practice analysis workflow pipeline to create raw vcf files from filtered bam files.
 
 The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker/Singularity containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation of this pipeline uses one container per process which makes it much easier to maintain and update software dependencies. Where possible, these processes have been submitted to and installed from [nf-core/modules](https://github.com/nf-core/modules) in order to make them available to all nf-core pipelines, and to everyone within the Nextflow community!
 
+The pipeline supports job/batch schedulers/distributed resource management systems (DRMS)/distributed resource managers (DRM), like The Slurm Workload Manager/sbatch.
+
 <!-- TODO nf-core: Add full-sized test dataset and amend the paragraph below if applicable -->
 
-On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources.The results obtained from the full-sized test can be viewed on the [nf-core website](https://nf-co.re/bamtorawvcf/results).
+On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources. The results obtained from the full-sized test can be viewed on the [nf-core website](https://nf-co.re/bamtorawvcf/results).
 
 ## Pipeline summary
 
 <!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
 
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+1. (optional) Fasta indices: Create sequence dictionary ([`picard`](https://broadinstitute.github.io/picard/index.html))
+2. (optional) Fasta indices: samtools faidx ([`Samtools`](https://www.htslib.org/))
+3. Create gVCF: Haplotype calling ([`gatk4`](https://github.com/broadinstitute/gatk))
+4. (optional) Create gVCF: sort VCF ([`picard`](https://broadinstitute.github.io/picard/index.html))
+5. Run genomics database import ([`gatk4`](https://github.com/broadinstitute/gatk))
 
 ## Quick Start
 
@@ -38,7 +43,7 @@ On release, automated continuous integration tests run the pipeline on a full-si
 3. Download the pipeline and test it on a minimal dataset with a single command:
 
    ```bash
-   nextflow run nf-core/bamtorawvcf -profile test,YOURPROFILE --outdir <OUTDIR>
+   nextflow run bamtovcf/ -profile test,YOURPROFILE --outdir <OUTDIR> --regions <path/to/NcbiReference/chrmId.list>
    ```
 
    Note that some form of configuration will be needed so that Nextflow knows how to fetch the required software. This is usually done in the form of a config profile (`YOURPROFILE` in the example command above). You can chain multiple config profiles in a comma-separated string.
@@ -48,13 +53,30 @@ On release, automated continuous integration tests run the pipeline on a full-si
    > - If you are using `singularity`, please use the [`nf-core download`](https://nf-co.re/tools/#downloading-pipelines-for-offline-use) command to download images first, before running the pipeline. Setting the [`NXF_SINGULARITY_CACHEDIR` or `singularity.cacheDir`](https://www.nextflow.io/docs/latest/singularity.html?#singularity-docker-hub) Nextflow options enables you to store and re-use the images from a central location for future pipeline runs.
    > - If you are using `conda`, it is highly recommended to use the [`NXF_CONDA_CACHEDIR` or `conda.cacheDir`](https://www.nextflow.io/docs/latest/conda.html) settings to store the environments in a central location for future pipeline runs.
 
+4. Set further configurations, depending on your computational environment, especially if resource managers are used or not.
+   - In `bamtovcf/nextflow.config` one can set an executer (resource manager), with `slurm` as the default.
+   - A computational facility may structure itself in Slurm clusters and Slurm partitions. If used, the pipeline expects the Slurm cluster to be specified outside of nextflow by a separate command:
+
+     ```bash
+     export SLURM_CLUSTERS=<CLUSTER-NAME>
+     ```
+
+   - The Slurm partition is specified in `bamtovcf/nextflow.config` under `queue = "<PARTITION-NAME>"`
+   - Also, in `fastqtobam/conf/base.config` the maximum amount of CPUs/memory/time per `nf-core`-label can be set.
+
+   If no resource manager is used, the respective lines need to be commented out.
+
+5. Sample inputs are provided by a directory path.
+
 4. Start running your own analysis!
 
    <!-- TODO nf-core: Update the example "typical command" below used to run the pipeline -->
 
    ```bash
-   nextflow run nf-core/bamtorawvcf --input samplesheet.csv --outdir <OUTDIR> --genome GRCh37 -profile <docker/singularity/podman/shifter/charliecloud/conda/institute>
+   nextflow run bamtovcf/ --input "<path/to/BamFiles/*.{bam,bam.bai}>" --outdir <OUTDIR> --skip_regionwise_gvcf --regions <path/to/NcbiReference/chrmId.list> --genome <SPECIES> --fasta <path/to/NcbiReference/*_reference_genome.fna> --skip_picard_seqdict --picard_seqdict <path/to/NcbiReference/*_reference_genome.dict> --skip_samtools_faidx --samtools_faidx <path/to/NcbiReference/*_reference_genome.fna.fai> -qs 40 -profile <docker/singularity/podman/shifter/charliecloud/conda/institute>
    ```
+
+    The `-qs` parameter specifies the number of parallel sent slurm jobs. If the pipeline is cancelled at some point, it can be continued with the `-resume` flag.
 
 ## Documentation
 
